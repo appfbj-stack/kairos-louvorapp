@@ -1,0 +1,34 @@
+services:
+  kairos-louvorapp:
+    build: .
+    container_name: kairos-louvorapp-app
+    restart: unless-stopped
+    ports:
+      - "3017:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      # JWT secret (gerar um novo e guardar em local seguro!)
+      - JWT_SECRET=${JWT_SECRET:-kairos-louvor-jwt-secret-2026-rotate-em-prod-A8nM3kP9xR2wT}
+      - APP_URL=${APP_URL:-https://louvorapp.fbautomacao.space}
+      - ADMIN_URL=${ADMIN_URL:-https://admin.louvorapp.fbautomacao.space}
+      # Conexão com o Postgres compartilhado (kairos-shared-pg)
+      - DATABASE_URL=postgresql://kairos_louvorapp_user:Louvor@k@i0s!2026@kairos-shared-pg:5432/kairos_louvorapp_db
+      # Google Gemini (mantido da V1 — feature de IA)
+      - API_KEY=${API_KEY:-}
+    networks:
+      - bridge
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+# O container se conecta à rede `bridge` (default) onde já está
+# o `kairos-shared-pg`, permitindo acessar o Postgres via DNS:
+#   kairos-shared-pg:5432
+networks:
+  bridge:
+    name: bridge
+    external: true

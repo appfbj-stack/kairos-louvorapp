@@ -1,0 +1,181 @@
+// Prisma Schema — Kairos LouvorApp (Multi-tenant SaaS)
+// Provider: PostgreSQL (kairos-shared-pg do Dokploy)
+// Banco dedicado: kairos_louvorapp_db
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================
+// TENANT (Multi-tenant: cada cliente = uma igreja/ministério)
+// ============================================================
+model Tenant {
+  id        String   @id @default(uuid())
+  name      String   // nome da igreja/ministério
+  slug      String   @unique // usado no subdomínio (igreja-x.louvorapp...)
+  logo      String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  // —— Controle de assinatura/bloqueio manual ——
+  subscriptionStatus  String     @default("TRIAL") // TRIAL | ACTIVE | BLOCKED | CANCELLED
+  trialEndsAt         DateTime?
+  subscriptionEndsAt  DateTime?
+  motivoBloqueio      String?
+  bloqueadoEm         DateTime?
+  bloqueadoPor        String?
+
+  users    User[]
+  songs    Song[]
+  events   Event[]
+  notices  Notice[]
+  messages ChatMessage[]
+}
+
+// ============================================================
+// USER (escopado por tenant)
+// ============================================================
+enum Role {
+  SUPER_ADMIN // GLOBAL — vê tudo, gerencia tenants
+  LEADER      // admin do tenant (líder de louvor)
+  MEMBER      // músico do tenant
+}
+
+model User {
+  id             String    @id @default(uuid())
+  tenantId       String
+  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name           String
+  email          String
+  passwordHash   String
+  role           Role      @default(MEMBER)
+  function       String    @default("Voz") // Voz, Violão, Guitarra, Teclado, Bateria, Baixo
+  instrument     String?
+  phone          String?
+  active         Boolean   @default(true)
+  lastLoginAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+}
+
+// ============================================================
+// SONG (Repertório com ChordPro cifras + arranjo)
+// ============================================================
+model Song {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  title       String
+  artist      String
+  key         String   // Tom oficial (ex: "A", "C", "G")
+  // Lyrics no formato ChordPro: "[C]Te amo Deus, [G]Tua graça nunca falha"
+  // Suporta [Intro], [Verso 1], [Refrão], [Ponte], [Final] como marcadores
+  lyrics      String   @db.Text
+  // Arranjo em markdown: ## Seções + - bullets com instruções ministeriais
+  arrangement  String?  @db.Text
+  youtubeUrl   String?
+  driveUrl     String?
+  audioUrl     String?
+  chordsUrl    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
+
+  @@index([tenantId])
+}
+
+// ============================================================
+// EVENT (Escala de cultos/ensaios)
+// ============================================================
+enum EventType {
+  SERVICE    // CULTO
+  REHEARSAL  // ENSAIO
+  SPECIAL    // ESPECIAL
+}
+
+enum PresenceStatus {
+  PENDING    // PENDENTE
+  CONFIRMED  // CONFIRMADO
+  DECLINED   // RECUSADO
+}
+
+model Event {
+  id           String       @id @default(uuid())
+  tenantId     String
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  title        String
+  type         EventType
+  date         String       // YYYY-MM-DD
+  time         String       // HH:MM
+  location     String
+  observations String?      @db.Text
+  // ScaleEntry[] embutido como JSON para simplicidade (MVP)
+  scale        Json         // [{userId, userName, function, status}]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  deletedAt    DateTime?
+
+  @@index([tenantId])
+  @@index([date])
+}
+
+// ============================================================
+// NOTICE (Mural de avisos)
+// ============================================================
+model Notice {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  title     String
+  content   String   @db.Text
+  isPinned  Boolean  @default(false)
+  authorId  String   // User.id do autor
+  authorName String  // denormalizado p/ queries rápidas
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@index([tenantId])
+}
+
+// ============================================================
+// CHAT MESSAGE (Conversas da equipe)
+// ============================================================
+model ChatMessage {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  senderId  String
+  senderName String
+  senderRole Role
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+}
+
+// ============================================================
+// AUDIT LOG (ações do Super Admin)
+// ============================================================
+model AuditLog {
+  id        String   @id @default(uuid())
+  superAdminId String
+  superAdminEmail String
+  action    String   // BLOCK_TENANT, UNBLOCK_TENANT, CREATE_TENANT, etc.
+  targetId  String?  // tenant.id alvo
+  details   Json?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}

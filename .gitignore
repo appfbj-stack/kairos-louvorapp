@@ -1,0 +1,34 @@
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build
+dist/
+*.cjs.map
+.vite/
+
+# Prisma generated (regenerado pelo prisma generate)
+generated/
+
+# Env (NUNCA commitar)
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Dokploy volumes (se houver mount local)
+backups/
+uploads/
