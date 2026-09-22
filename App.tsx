@@ -21,11 +21,11 @@ import { DataProvider, useData } from './context/DataContext';
 import { User as UserIcon, LogIn, ChevronRight } from 'lucide-react';
 import AdminApp from './src/admin/AdminApp';
 
-// ── Detecção de subdomínio: admin.louvorapp... → painel Super Admin ──
-function isAdminSubdomain(): boolean {
+// ── Detecção de rota admin: louvorapp.fbautomacao.space/admin/* → painel Super Admin ──
+// Path-based (não subdomínio) pra evitar problema de cert SSL wildcard.
+function isAdminPath(): boolean {
   if (typeof window === 'undefined') return false;
-  const host = window.location.hostname;
-  return host.startsWith('admin.') || host === 'admin.localhost';
+  return window.location.pathname.startsWith('/admin');
 }
 
 const Login: React.FC = () => {
@@ -103,8 +103,9 @@ const AppContent: React.FC = () => {
 };
 
 const App: React.FC = () => {
-  // Super Admin renderiza em subdomínio próprio — sem Layout de tenant
-  if (isAdminSubdomain()) {
+  // Painel Super Admin: detectado por path /admin/* (não subdomínio,
+  // pra evitar cert SSL wildcard). Compartilha mesmo deploy do tenant.
+  if (isAdminPath()) {
     return <AdminApp />;
   }
   return (
