@@ -20,10 +20,13 @@
 
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
+import path from 'path';
+import fs from 'fs';
 import { prisma } from '../../config/database';
 import { asyncHandler } from '../../middleware/asyncHandler';
 import { authMiddleware } from '../../middleware/auth';
 import { requireSuperAdmin } from '../../middleware/superAdmin';
+import { uploadLogoMiddleware, LOGO_DIR } from '../../middleware/uploadLogo';
 
 const router = Router();
 router.use(authMiddleware, requireSuperAdmin);
@@ -217,6 +220,61 @@ router.patch(
 
     const updated = await prisma.tenant.update({ where: { id: req.params.id }, data });
     return res.json({ success: true, data: updated });
+  }),
+);
+
+// ── POST /api/super-admin/tenants/:id/logo ──────────────────
+// Upload de imagem (PNG/JPG/WEBP/SVG) — salva em /app/logos/<id>.<ext>
+router.post(
+  '/tenants/:id/logo',
+  asyncHandler(async (req: Request, res: Response) => {
+    // Roda o multer; se der erro (tipo/tamanho) cai no asyncHandler
+    await new Promise<void>((resolve, reject) => {
+      uploadLogoMiddleware(req, res, (err: any) => {
+        if (err) return reject(err);
+        resolve();
+      });
+    });
+
+    const file = (req as any).file as Express.Multer.File | undefined;
+    if (!file) {
+      return res.status(400).json({ success: false, error: 'Nenhum arquivo enviado (campo "logo").' });
+    }
+
+    // Remove logo(s) antigos do mesmo tenant (extensões diferentes)
+    try {
+      const tenantId = req.params.id;
+      for (const f of fs.readdirSync(LOGO_DIR)) {
+        if (f.startsWith(tenantId + '.') && f !== file.filename) {
+          fs.unlinkSync(path.join(LOGO_DIR, f));
+        }
+      }
+    } catch (e) {
+      console.warn('Falha limpando logos antigos:', e);
+    }
+
+    // Atualiza coluna logo com URL pública
+    const publicUrl = `/logos/${file.filename}`;
+    const updated = await prisma.tenant.update({
+      where: { id: req.params.id },
+      data: { logo: publicUrl },
+    });
+
+    // Audit log
+    await prisma.auditLog.create({
+      data: {
+        superAdminId: req.auth!.userId,
+        superAdminEmail: req.auth!.email,
+        action: 'UPDATE_TENANT_LOGO',
+        targetId: updated.id,
+        details: { filename: file.filename, size: file.size, mimetype: file.mimetype },
+      },
+    });
+
+    return res.json({
+      success: true,
+      data: { ...updated, logoUrl: publicUrl },
+    });
   }),
 );
 

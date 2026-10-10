@@ -158,6 +158,17 @@ export async function deleteTenant(id: string) {
   return data;
 }
 
+export async function uploadTenantLogo(id: string, file: File) {
+  const fd = new FormData();
+  fd.append("logo", file);
+  const { data } = await adminApi.post(
+    `/api/super-admin/tenants/${id}/logo`,
+    fd,
+    { headers: { "Content-Type": "multipart/form-data" } }
+  );
+  return data;
+}
+
 export async function getAuditLog(params: { page?: number; limit?: number }) {
   const { data } = await adminApi.get("/api/super-admin/audit", { params });
   return data;

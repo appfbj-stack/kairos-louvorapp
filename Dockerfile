@@ -31,6 +31,7 @@ RUN npm run build
 FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+ENV UPLOAD_DIR=/app/uploads
 
 # Dependências runtime (openssl pro Prisma, curl pro healthcheck)
 RUN apk add --no-cache openssl libc6-compat curl tini
@@ -45,8 +46,11 @@ COPY --from=builder /app/generated ./generated
 COPY --from=builder /app/index.html ./index.html
 COPY --from=builder /app/metadata.json ./metadata.json
 
+# Cria diretórios de runtime e transfere ownership para o user `node` (UID 1000)
+RUN mkdir -p /app/backups /app/uploads/logos && \
+    chown -R node:node /app
+
 # Não rodar como root — usa o user `node` da imagem oficial
-RUN chown -R node:node /app
 USER node
 
 # Healthcheck (consulta a API real)

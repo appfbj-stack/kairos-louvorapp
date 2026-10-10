@@ -1,6 +1,6 @@
 // Detalhe de um tenant: dados + histórico de bloqueios + audit log específico
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import {
   getTenant,
@@ -8,6 +8,7 @@ import {
   unblockTenant,
   resetTrial,
   deleteTenant,
+  uploadTenantLogo,
   TenantRow,
 } from "../api";
 
@@ -17,6 +18,24 @@ export default function TenantDetail() {
   const [tenant, setTenant] = useState<TenantRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [logoError, setLogoError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  async function handleLogoUpload(file: File) {
+    setUploadingLogo(true);
+    setLogoError(null);
+    try {
+      await uploadTenantLogo(id!, file);
+      await load();
+    } catch (e: any) {
+      setLogoError(
+        e.response?.data?.error || e.message || "Erro ao enviar logo"
+      );
+    } finally {
+      setUploadingLogo(false);
+    }
+  }
 
   async function load() {
     if (!id) return;
@@ -112,6 +131,55 @@ export default function TenantDetail() {
             </div>
           </div>
           <StatusBadge status={tenant.subscriptionStatus} />
+        </div>
+      </div>
+
+      {/* Logo */}
+      <div className="bg-slate-900 border border-slate-800 rounded-lg p-5 mb-6">
+        <h2 className="font-semibold text-sm uppercase tracking-wider text-slate-300 mb-4">
+          Logo
+        </h2>
+        <div className="flex items-center gap-4">
+          <div className="w-20 h-20 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center overflow-hidden shrink-0">
+            {tenant.logo ? (
+              <img
+                src={tenant.logo}
+                alt="logo"
+                className="w-full h-full object-contain"
+              />
+            ) : (
+              <span className="text-2xl text-slate-600">∅</span>
+            )}
+          </div>
+          <div className="flex-1">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/svg+xml"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleLogoUpload(f);
+              }}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingLogo}
+              className="text-sm px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 rounded border border-amber-500/30 disabled:opacity-50"
+            >
+              {uploadingLogo
+                ? "Enviando..."
+                : tenant.logo
+                ? "Trocar logo"
+                : "Enviar logo"}
+            </button>
+            <div className="text-[11px] text-slate-500 mt-2">
+              PNG, JPG, WEBP ou SVG. Máx 2 MB.
+            </div>
+            {logoError && (
+              <div className="text-xs text-red-400 mt-2">{logoError}</div>
+            )}
+          </div>
         </div>
       </div>
 

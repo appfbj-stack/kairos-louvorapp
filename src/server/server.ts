@@ -12,6 +12,7 @@ import eventsRoutes from "./modules/events/events.routes";
 import noticesRoutes from "./modules/notices/notices.routes";
 import chatRoutes from "./modules/chat/chat.routes";
 import { authMiddleware } from "./middleware/auth";
+import fs from "fs";
 
 async function startServer() {
   const app = express();
@@ -99,6 +100,19 @@ async function startServer() {
   app.use("/api/auth", authRoutes);
   // Super Admin — autenticado, role SUPER_ADMIN
   app.use("/api/super-admin", authMiddleware, superAdminRoutes);
+
+  // ==========================================
+  // Log estático de logos (servido publicamente)
+  // ==========================================
+  const LOGO_DIR = path.join(process.env.UPLOAD_DIR || path.join(process.cwd(), "uploads"), "logos");
+  if (!fs.existsSync(LOGO_DIR)) fs.mkdirSync(LOGO_DIR, { recursive: true });
+  app.use(
+    "/logos",
+    express.static(LOGO_DIR, {
+      maxAge: "7d",
+      immutable: true,
+    })
+  );
 
   // ==========================================
   // Tenant routes — autenticado (tenant vem do JWT)
