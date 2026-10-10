@@ -263,8 +263,8 @@ router.post(
     // Audit log
     await prisma.auditLog.create({
       data: {
-        superAdminId: req.auth!.userId,
-        superAdminEmail: req.auth!.email,
+        superAdminId: req.user!.userId,
+        superAdminEmail: req.user!.email,
         action: 'UPDATE_TENANT_LOGO',
         targetId: updated.id,
         details: { filename: file.filename, size: file.size, mimetype: file.mimetype },
