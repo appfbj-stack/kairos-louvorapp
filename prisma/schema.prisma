@@ -124,16 +124,18 @@ model Song {
 // ============================================================
 // EVENT (Escala de cultos/ensaios)
 // ============================================================
+// Os valores dos enums sao os mesmos que o app mostra na tela
+// (CULTO/ENSAIO/ESPECIAL e PENDENTE/CONFIRMADO/RECUSADO).
 enum EventType {
-  SERVICE    // CULTO
-  REHEARSAL  // ENSAIO
-  SPECIAL    // ESPECIAL
+  CULTO
+  ENSAIO
+  ESPECIAL
 }
 
 enum PresenceStatus {
-  PENDING    // PENDENTE
-  CONFIRMED  // CONFIRMADO
-  DECLINED   // RECUSADO
+  PENDENTE
+  CONFIRMADO
+  RECUSADO
 }
 
 model Event {
