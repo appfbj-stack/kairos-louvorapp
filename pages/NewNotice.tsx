@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Sparkles, Pin, Check, AlignLeft, Type, Send } from 'lucide-react';
-import { GeminiService } from '../services/geminiService';
+import { AIService } from '../services/aiService';
 import { useData } from '../context/DataContext';
 import { Notice } from '../types';
 
@@ -17,7 +17,7 @@ const NewNotice: React.FC = () => {
     isPinned: false,
   });
 
-  const gemini = GeminiService.getInstance();
+  const ai = AIService.getInstance();
   const currentUser = users.find(u => u.id === currentUserId);
 
   const handleSave = async (e: React.FormEvent) => {
@@ -43,7 +43,7 @@ const NewNotice: React.FC = () => {
   const refineWithAI = async () => {
     if (!formData.content) return;
     setRefining(true);
-    const refined = await gemini.refineAnnouncement(formData.content);
+    const refined = await ai.refineAnnouncement(formData.content);
     setFormData({ ...formData, content: refined });
     setRefining(false);
   };

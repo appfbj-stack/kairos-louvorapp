@@ -25,7 +25,7 @@ import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { PresenceStatus, Song, Notice, EventType } from '../types';
-import { GeminiService } from '../services/geminiService';
+import { AIService } from '../services/aiService';
 import { useData } from '../context/DataContext';
 import { ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
@@ -244,7 +244,7 @@ const Dashboard: React.FC = () => {
   const [copied, setCopied] = useState(false);
   
   const pinnedNotice = notices.find(n => n.isPinned);
-  const gemini = GeminiService.getInstance();
+  const ai = AIService.getInstance();
 
   useEffect(() => {
     if (nextEvent && currentUserId) {
@@ -257,7 +257,7 @@ const Dashboard: React.FC = () => {
     if (songs.length === 0) return;
     setIsLoadingReflection(true);
     const songTitles = songs.slice(0, 3).map(s => s.title);
-    const text = await gemini.generateSpiritualReflection(songTitles);
+    const text = await ai.generateSpiritualReflection(songTitles);
     setReflection(text);
     setIsLoadingReflection(false);
   };

@@ -1,17 +1,18 @@
 
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { 
-  Calendar, 
-  Music, 
-  Users, 
-  Megaphone, 
-  Home, 
+import {
+  Calendar,
+  Music,
+  Users,
+  Megaphone,
+  Home,
   LogOut,
   Settings as SettingsIcon,
   MessageSquare,
   Mic,
-  Tv
+  Tv,
+  Sparkles
 } from 'lucide-react';
 import { UserRole } from '../types';
 import { useData } from '../context/DataContext';
@@ -27,6 +28,7 @@ const Layout: React.FC<LayoutProps> = ({ children, userRole, onLogout }) => {
 
   const navItems = [
     { to: '/', icon: Home, label: 'Início' },
+    { to: '/kairós', icon: Sparkles, label: 'Kairós' },
     { to: '/agenda', icon: Calendar, label: 'Agenda' },
     { to: '/repertorio', icon: Music, label: 'Repertório' },
     ...(settings?.enableVocalTraining !== false ? [{ to: '/vocal', icon: Mic, label: 'Técnica Vocal' }] : []),

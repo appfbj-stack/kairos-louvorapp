@@ -184,9 +184,10 @@ const Settings: React.FC = () => {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       const json = event.target?.result as string;
-      if (importData(json)) {
+      const ok = await importData(json);
+      if (ok) {
         alert('Dados importados com sucesso! O aplicativo será recarregado.');
         window.location.reload();
       } else {

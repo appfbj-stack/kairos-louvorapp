@@ -1,7 +1,21 @@
+/**
+ * DataContext.tsx — Estado do tenant agora vem da API (Postgres), não do navegador.
+ *
+ * A interface pública foi mantida igual à versão localStorage de propósito:
+ * as 14 telas existentes continuam consumindo exatamente os mesmos hooks.
+ */
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, Song, Event, Notice, MinistrySettings, ChatMessage, UserRole } from '../types';
-import { MOCK_USERS, MOCK_SONGS, MOCK_EVENTS, MOCK_NOTICES } from '../constants';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { User, Song, Event, Notice, MinistrySettings, ChatMessage, PresenceStatus } from '../types';
+import {
+  songsApi,
+  eventsApi,
+  noticesApi,
+  membersApi,
+  chatApi,
+  settingsApi,
+} from '../services/api';
+import { useAuth } from './AuthContext';
 
 interface DataContextType {
   users: User[];
@@ -13,25 +27,34 @@ interface DataContextType {
   readNoticeIds: string[];
   currentUserId: string | null;
   setCurrentUserId: (id: string | null) => void;
-  addUser: (user: User) => void;
-  updateUser: (user: User) => void;
-  deleteUser: (id: string) => void;
-  addSong: (song: Song) => void;
-  updateSong: (song: Song) => void;
-  addEvent: (event: Event) => void;
-  addNotice: (notice: Notice) => void;
-  updateSettings: (settings: MinistrySettings) => void;
-  updateEventStatus: (eventId: string, userId: string, status: any) => void;
-  addChatMessage: (content: string) => void;
-  clearChat: () => void;
+  loading: boolean;
+  error: string | null;
+  reload: () => Promise<void>;
+
+  addUser: (user: User & { password?: string }) => Promise<void>;
+  updateUser: (user: User) => Promise<void>;
+  deleteUser: (id: string) => Promise<void>;
+  addSong: (song: Song) => Promise<void>;
+  updateSong: (song: Song) => Promise<void>;
+  deleteSong: (id: string) => Promise<void>;
+  addEvent: (event: Event) => Promise<void>;
+  updateEvent: (event: Event) => Promise<void>;
+  deleteEvent: (id: string) => Promise<void>;
+  addNotice: (notice: Notice) => Promise<void>;
+  updateNotice: (notice: Notice) => Promise<void>;
+  deleteNotice: (id: string) => Promise<void>;
+  updateSettings: (settings: MinistrySettings) => Promise<void>;
+  updateEventStatus: (eventId: string, userId: string, status: PresenceStatus) => Promise<void>;
+  addChatMessage: (content: string) => Promise<void>;
+  clearChat: () => Promise<void>;
   markNoticeAsRead: (id: string) => void;
   markAllNoticesAsRead: () => void;
   exportData: () => string;
-  importData: (json: string) => boolean;
+  importData: (json: string) => Promise<boolean>;
 }
 
 const DEFAULT_SETTINGS: MinistrySettings = {
-  name: 'Kairos louvor',
+  name: 'Kairos Louvor',
   churchName: 'Igreja Local',
   youtubeChannel: '',
   driveFolder: '',
@@ -41,247 +64,274 @@ const DEFAULT_SETTINGS: MinistrySettings = {
   allowMemberNotices: true,
   confirmationDeadlineDays: 3,
   enableVocalTraining: true,
-  enableVideoLessons: true
+  enableVideoLessons: true,
 };
-
-const DEFAULT_CHAT_MESSAGES: ChatMessage[] = [
-  {
-    id: 'm1',
-    senderId: '1',
-    senderName: 'André Silva',
-    senderRole: UserRole.LEADER,
-    senderFunction: 'Líder / Violão',
-    content: 'Olá pessoal! Sejam bem-vindos ao chat do nosso ministério de louvor. Vamos usar este espaço para alinhar ensaios, tirar dúvidas de cifras e compartilhar devocionais. 🙏',
-    timestamp: '2026-07-03T18:00:00Z'
-  },
-  {
-    id: 'm2',
-    senderId: '2',
-    senderName: 'Juliana Costa',
-    senderRole: UserRole.MEMBER,
-    senderFunction: 'Voz / Backing',
-    content: 'Que bênção! Estava mesmo precisando de um canal rápido para falar com vocês. André, o tom de "A Casa é Sua" vai ser em Lá (A) mesmo no domingo?',
-    timestamp: '2026-07-03T18:15:00Z'
-  },
-  {
-    id: 'm3',
-    senderId: '1',
-    senderName: 'André Silva',
-    senderRole: UserRole.LEADER,
-    senderFunction: 'Líder / Violão',
-    content: 'Isso, Ju! Mantivemos em Lá (A) para ficar confortável para a sua voz e para a congregação acompanhar de forma espontânea.',
-    timestamp: '2026-07-03T18:20:00Z'
-  },
-  {
-    id: 'm4',
-    senderId: '3',
-    senderName: 'Ricardo Santos',
-    senderRole: UserRole.MEMBER,
-    senderFunction: 'Bateria',
-    content: 'Fechado! No ensaio de ontem achei que a transição de bateria no final ficou excelente. Prontos para domingo!',
-    timestamp: '2026-07-03T19:30:00Z'
-  },
-  {
-    id: 'm5',
-    senderId: '4',
-    senderName: 'Mariana Lima',
-    senderRole: UserRole.MEMBER,
-    senderFunction: 'Teclado',
-    content: 'Amém! Vou repassar os arranjos de teclado hoje à noite. Se alguém tiver alguma dúvida de harmonia, me avisem.',
-    timestamp: '2026-07-03T19:45:00Z'
-  }
-];
-
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentUserId, setCurrentUserId] = useState<string | null>(localStorage.getItem('louvor_current_user_id'));
+  const { user: authUser } = useAuth();
 
-  const [users, setUsers] = useState<User[]>(() => {
-    const saved = localStorage.getItem('louvor_users');
-    return saved ? JSON.parse(saved) : MOCK_USERS;
-  });
+  const [users, setUsers] = useState<User[]>([]);
+  const [songs, setSongs] = useState<Song[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
+  const [notices, setNotices] = useState<Notice[]>([]);
+  const [settings, setSettings] = useState<MinistrySettings>(DEFAULT_SETTINGS);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [readNoticeIds, setReadNoticeIds] = useState<string[]>(
+    () => JSON.parse(localStorage.getItem('louvor_read_notice_ids') || '[]'),
+  );
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const [songs, setSongs] = useState<Song[]>(() => {
-    const saved = localStorage.getItem('louvor_songs');
-    if (saved) {
-      try {
-        const parsed: Song[] = JSON.parse(saved);
-        // Migração: garantir que toda música tenha o campo arrangement
-        const migrated: Song[] = parsed.map(s => ({ ...s, arrangement: s.arrangement || '' }));
+  // currentUserId continua existindo (as telas usam), mas vem da sessão real
+  const currentUserId = authUser?.id ?? null;
+  const setCurrentUserId = useCallback(() => {}, []);
 
-        // Migração avançada: detectar se os MOCK_SONGS do bundle são mais novos
-        // que os do localStorage e sincronizar.
-        // - Para MOCKs conhecidos com cifras novas: atualiza a letra e o arranjo.
-        // - Para MOCKs novos (que não existem no localStorage): adiciona a partir do bundle.
-        const knownIds = new Set(migrated.map(s => s.id));
-
-        // 1. Atualiza MOCKs existentes que ganharam cifras/arranjo
-        const syncedExisting: Song[] = migrated.map(s => {
-          const newMock = MOCK_SONGS.find(m => m.id === s.id);
-          if (newMock) {
-            const oldHasChords = /\[[A-G][#b]?[^]]*\]/.test(s.lyrics || '');
-            const newHasChords = /\[[A-G][#b]?[^]]*\]/.test(newMock.lyrics || '');
-            const needsUpdate = !oldHasChords && newHasChords;
-            const hasNoArrangement = !s.arrangement || s.arrangement.trim() === '';
-            if (needsUpdate || hasNoArrangement) {
-              return {
-                ...s,
-                lyrics: newMock.lyrics,
-                arrangement: newMock.arrangement || s.arrangement || '',
-              };
-            }
-          }
-          return s;
-        });
-
-        // 2. Adiciona MOCKs novos que ainda não existem no localStorage
-        const newMocks: Song[] = MOCK_SONGS
-          .filter(m => !knownIds.has(m.id))
-          .map(m => ({ ...m, arrangement: m.arrangement || '' }));
-
-        return [...newMocks, ...syncedExisting];
-      } catch (e) {
-        return MOCK_SONGS;
-      }
-    }
-    return MOCK_SONGS;
-  });
-
-  const [events, setEvents] = useState<Event[]>(() => {
-    const saved = localStorage.getItem('louvor_events');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed.length <= 2 || !parsed.some((e: any) => e.id.startsWith('gen_e_'))) {
-          return MOCK_EVENTS;
-        }
-        return parsed;
-      } catch (e) {
-        return MOCK_EVENTS;
-      }
-    }
-    return MOCK_EVENTS;
-  });
-
-  const [notices, setNotices] = useState<Notice[]>(() => {
-    const saved = localStorage.getItem('louvor_notices');
-    return saved ? JSON.parse(saved) : MOCK_NOTICES;
-  });
-
-  const [settings, setSettings] = useState<MinistrySettings>(() => {
-    const saved = localStorage.getItem('louvor_settings');
-    return saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
-  });
-
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => {
-    const saved = localStorage.getItem('louvor_chat_messages');
-    return saved ? JSON.parse(saved) : DEFAULT_CHAT_MESSAGES;
-  });
-
-  const [readNoticeIds, setReadNoticeIds] = useState<string[]>(() => {
-    const saved = localStorage.getItem('louvor_read_notice_ids');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  useEffect(() => localStorage.setItem('louvor_users', JSON.stringify(users)), [users]);
-  useEffect(() => localStorage.setItem('louvor_songs', JSON.stringify(songs)), [songs]);
-  useEffect(() => localStorage.setItem('louvor_events', JSON.stringify(events)), [events]);
-  useEffect(() => localStorage.setItem('louvor_notices', JSON.stringify(notices)), [notices]);
-  useEffect(() => localStorage.setItem('louvor_settings', JSON.stringify(settings)), [settings]);
-  useEffect(() => localStorage.setItem('louvor_chat_messages', JSON.stringify(chatMessages)), [chatMessages]);
-  useEffect(() => localStorage.setItem('louvor_read_notice_ids', JSON.stringify(readNoticeIds)), [readNoticeIds]);
+  // Avisos lidos é o único estado que fica local (é por aparelho, não do ministry)
   useEffect(() => {
-    if (currentUserId) localStorage.setItem('louvor_current_user_id', currentUserId);
-    else localStorage.removeItem('louvor_current_user_id');
-  }, [currentUserId]);
+    localStorage.setItem('louvor_read_notice_ids', JSON.stringify(readNoticeIds));
+  }, [readNoticeIds]);
 
-  const addUser = (user: User) => setUsers([user, ...users]);
-  const updateUser = (updatedUser: User) => setUsers(users.map(u => u.id === updatedUser.id ? updatedUser : u));
-  const deleteUser = (id: string) => setUsers(users.filter(u => u.id !== id));
-  const addSong = (song: Song) => setSongs([song, ...songs]);
-  const updateSong = (updatedSong: Song) => setSongs(songs.map(s => s.id === updatedSong.id ? updatedSong : s));
-  const addEvent = (event: Event) => setEvents([event, ...events]);
-  const addNotice = (notice: Notice) => {
-    let updated = [...notices];
-    if (notice.isPinned) updated = updated.map(n => ({ ...n, isPinned: false }));
-    setNotices([notice, ...updated]);
+  const reload = useCallback(async () => {
+    if (!authUser) return;
+    setError(null);
+    try {
+      // membros primeiro: o chat usa a função de cada sender
+      const [us, sg, ev, nt, st, cm] = await Promise.all([
+        membersApi.list(),
+        songsApi.list(),
+        eventsApi.list(),
+        noticesApi.list(),
+        settingsApi.get(),
+        chatApi.list(),
+      ]);
+      setUsers(us);
+      setSongs(sg);
+      setEvents(ev);
+      setNotices(nt);
+      setSettings({ ...DEFAULT_SETTINGS, ...st });
+      setChatMessages(
+        cm.map((m) => ({ ...m, senderFunction: us.find((u) => u.id === m.senderId)?.function ?? '' })),
+      );
+    } catch (e: any) {
+      setError(e?.message || 'Falha ao carregar os dados');
+    } finally {
+      setLoading(false);
+    }
+  }, [authUser]);
+
+  useEffect(() => {
+    if (authUser) {
+      setLoading(true);
+      reload();
+    } else {
+      // logout: limpa tudo pra não vazar dados entre contas no mesmo aparelho
+      setUsers([]);
+      setSongs([]);
+      setEvents([]);
+      setNotices([]);
+      setChatMessages([]);
+      setSettings(DEFAULT_SETTINGS);
+      setLoading(false);
+    }
+  }, [authUser, reload]);
+
+  // ── Membros ───────────────────────────────────────────────────
+  const addUser = async (u: User & { password?: string }) => {
+    if (!u.password) throw new Error('Defina uma senha para o novo membro');
+    const created = await membersApi.create({ ...u, password: u.password });
+    setUsers((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
   };
-  const updateSettings = (newSettings: MinistrySettings) => setSettings(newSettings);
 
-  const markNoticeAsRead = (id: string) => {
-    if (!readNoticeIds.includes(id)) {
-      setReadNoticeIds(prev => [...prev, id]);
+  const updateUser = async (u: User) => {
+    const updated = await membersApi.update(u.id, u);
+    setUsers((prev) => prev.map((x) => (x.id === u.id ? updated : x)));
+  };
+
+  const deleteUser = async (id: string) => {
+    await membersApi.remove(id);
+    setUsers((prev) => prev.filter((u) => u.id !== id));
+  };
+
+  // ── Músicas ───────────────────────────────────────────────────
+  const addSong = async (s: Song) => {
+    const created = await songsApi.create(s);
+    setSongs((prev) => [created, ...prev]);
+  };
+
+  const updateSong = async (s: Song) => {
+    const updated = await songsApi.update(s.id, s);
+    setSongs((prev) => prev.map((x) => (x.id === s.id ? updated : x)));
+  };
+
+  const deleteSong = async (id: string) => {
+    await songsApi.remove(id);
+    setSongs((prev) => prev.filter((s) => s.id !== id));
+  };
+
+  // ── Eventos ───────────────────────────────────────────────────
+  const addEvent = async (e: Event) => {
+    const created = await eventsApi.create(e);
+    setEvents((prev) => [...prev, created]);
+  };
+
+  const updateEvent = async (e: Event) => {
+    const updated = await eventsApi.update(e.id, e);
+    setEvents((prev) => prev.map((x) => (x.id === e.id ? updated : x)));
+  };
+
+  const deleteEvent = async (id: string) => {
+    await eventsApi.remove(id);
+    setEvents((prev) => prev.filter((e) => e.id !== id));
+  };
+
+  const updateEventStatus = async (
+    eventId: string,
+    userId: string,
+    status: PresenceStatus,
+  ) => {
+    // atualização otimista: a tela responde na hora, o servidor confirma depois
+    let nextScale: Event['scale'] = [];
+    setEvents((prev) =>
+      prev.map((ev) => {
+        if (ev.id !== eventId) return ev;
+        nextScale = ev.scale.map((s) => (s.userId === userId ? { ...s, status } : s));
+        return { ...ev, scale: nextScale };
+      }),
+    );
+    try {
+      const updated = await eventsApi.update(eventId, { scale: nextScale });
+      setEvents((prev) => prev.map((x) => (x.id === eventId ? updated : x)));
+    } catch (e: any) {
+      setError(e?.message || 'Não foi possível atualizar a escala');
+      await reload();
     }
   };
 
-  const markAllNoticesAsRead = () => {
-    const allIds = notices.map(n => n.id);
-    setReadNoticeIds(allIds);
+  // ── Avisos ────────────────────────────────────────────────────
+  const addNotice = async (n: Notice) => {
+    let created = await noticesApi.create(n);
+    if (n.isPinned) {
+      // o banco só garante 1 fixado no PATCH — então desmarca os antigos
+      const others = notices.filter((x) => x.isPinned && x.id !== created.id);
+      await Promise.all(others.map((x) => noticesApi.update(x.id, { isPinned: false })));
+      setNotices((prev) => [created, ...prev.map((x) => ({ ...x, isPinned: false }))]);
+    } else {
+      setNotices((prev) => [created, ...prev]);
+    }
+    return created;
   };
 
-  const addChatMessage = (content: string) => {
-    if (!currentUserId) return;
-    const currentUser = users.find(u => u.id === currentUserId);
-    if (!currentUser) return;
-
-    const newMessage: ChatMessage = {
-      id: `chat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      senderId: currentUser.id,
-      senderName: currentUser.name,
-      senderRole: currentUser.role,
-      senderFunction: currentUser.function,
-      content,
-      timestamp: new Date().toISOString()
-    };
-
-    setChatMessages(prev => [...prev, newMessage]);
+  const updateNotice = async (n: Notice) => {
+    const updated = await noticesApi.update(n.id, n);
+    setNotices((prev) => prev.map((x) => (x.id === n.id ? updated : x)));
   };
 
-  const clearChat = () => {
+  const deleteNotice = async (id: string) => {
+    await noticesApi.remove(id);
+    setNotices((prev) => prev.filter((n) => n.id !== id));
+  };
+
+  // ── Configurações ────────────────────────────────────────────
+  const updateSettings = async (s: MinistrySettings) => {
+    const saved = await settingsApi.save(s);
+    setSettings({ ...DEFAULT_SETTINGS, ...saved });
+  };
+
+  // ── Chat ──────────────────────────────────────────────────────
+  const addChatMessage = async (content: string) => {
+    const text = content.trim();
+    if (!text) return;
+    const created = await chatApi.send(text);
+    setChatMessages((prev) => [
+      ...prev,
+      {
+        id: created.id,
+        senderId: created.senderId,
+        senderName: created.senderName,
+        senderRole: created.senderRole,
+        senderFunction: users.find((u) => u.id === created.senderId)?.function ?? '',
+        content: created.content,
+        timestamp: created.createdAt,
+      },
+    ]);
+  };
+
+  const clearChat = async () => {
+    await chatApi.clear();
     setChatMessages([]);
   };
 
-  const updateEventStatus = (eventId: string, userId: string, status: any) => {
+  // ── Avisos lidos (local) ──────────────────────────────────────
+  const markNoticeAsRead = useCallback((id: string) => {
+    setReadNoticeIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+  }, []);
 
-    setEvents(events.map(event => {
-      if (event.id === eventId) {
-        return {
-          ...event,
-          scale: event.scale.map(s => s.userId === userId ? { ...s, status } : s)
-        };
-      }
-      return event;
-    }));
-  };
+  const markAllNoticesAsRead = useCallback(() => {
+    setReadNoticeIds(notices.map((n) => n.id));
+  }, [notices]);
 
-  const exportData = () => {
-    const data = { users, songs, events, notices, settings };
-    return JSON.stringify(data, null, 2);
-  };
+  // ── Backup ────────────────────────────────────────────────────
+  const exportData = () =>
+    JSON.stringify({ users, songs, events, notices, settings }, null, 2);
 
-  const importData = (json: string) => {
+  const importData = async (json: string): Promise<boolean> => {
     try {
       const data = JSON.parse(json);
-      if (data.users) setUsers(data.users);
-      if (data.songs) setSongs(data.songs);
-      if (data.events) setEvents(data.events);
-      if (data.notices) setNotices(data.notices);
-      if (data.settings) setSettings(data.settings);
+      for (const s of data.songs ?? []) {
+        await songsApi.create(s);
+      }
+      for (const e of data.events ?? []) {
+        await eventsApi.create(e);
+      }
+      for (const n of data.notices ?? []) {
+        await noticesApi.create({ ...n, authorId: undefined });
+      }
+      await reload();
       return true;
-    } catch (e) {
-      console.error("Erro ao importar dados", e);
+    } catch {
       return false;
     }
   };
 
   return (
-    <DataContext.Provider value={{ 
-      users, songs, events, notices, settings, chatMessages, readNoticeIds, currentUserId, setCurrentUserId,
-      addUser, updateUser, deleteUser, addSong, updateSong, addEvent, addNotice, updateSettings,
-      updateEventStatus, addChatMessage, clearChat, markNoticeAsRead, markAllNoticesAsRead, exportData, importData
-    }}>
+    <DataContext.Provider
+      value={{
+        users,
+        songs,
+        events,
+        notices,
+        settings,
+        chatMessages,
+        readNoticeIds,
+        currentUserId,
+        setCurrentUserId,
+        loading,
+        error,
+        reload,
+        addUser,
+        updateUser,
+        deleteUser,
+        addSong,
+        updateSong,
+        deleteSong,
+        addEvent,
+        updateEvent,
+        deleteEvent,
+        addNotice,
+        updateNotice,
+        deleteNotice,
+        updateSettings,
+        updateEventStatus,
+        addChatMessage,
+        clearChat,
+        markNoticeAsRead,
+        markAllNoticesAsRead,
+        exportData,
+        importData,
+      }}
+    >
       {children}
     </DataContext.Provider>
   );
@@ -289,6 +339,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 export const useData = () => {
   const context = useContext(DataContext);
-  if (!context) throw new Error('useData must be used within a DataProvider');
+  if (!context) throw new Error('useData deve ser usado dentro de DataProvider');
   return context;
 };

@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, Mail, Phone, Music, Briefcase, Shield, Check } from 'lucide-react';
+import { ArrowLeft, User, Mail, Phone, Music, Briefcase, Shield, Check, Lock } from 'lucide-react';
 import { UserRole, User as UserType } from '../types';
 import { useData } from '../context/DataContext';
 
@@ -9,6 +9,7 @@ const NewMember: React.FC = () => {
   const navigate = useNavigate();
   const { addUser } = useData();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -16,24 +17,36 @@ const NewMember: React.FC = () => {
     role: UserRole.MEMBER,
     function: '',
     instrument: '',
+    password: '',
   });
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    
-    // Criar objeto do novo membro
-    const newMember: UserType = {
-      id: Date.now().toString(),
-      ...formData
-    };
+    setError(null);
 
-    // Simular delay de rede e salvar
-    setTimeout(() => {
-      addUser(newMember);
-      setLoading(false);
+    if (formData.password.length < 6) {
+      setError('A senha precisa ter pelo menos 6 caracteres');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await addUser({
+        id: '',
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        role: formData.role,
+        function: formData.function,
+        instrument: formData.instrument,
+        password: formData.password,
+      } as UserType & { password: string });
       navigate('/membros');
-    }, 800);
+    } catch (err: any) {
+      setError(err?.message || 'Não foi possível salvar o membro');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -155,7 +168,29 @@ const NewMember: React.FC = () => {
               </button>
             </div>
           </div>
+
+          <div className="relative">
+            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <input
+              required
+              minLength={6}
+              type="password"
+              placeholder="Senha de acesso (mín. 6 caracteres)"
+              className="w-full pl-11 pr-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all text-slate-800 font-medium"
+              value={formData.password}
+              onChange={e => setFormData({ ...formData, password: e.target.value })}
+            />
+          </div>
+          <p className="text-xs text-slate-400 pl-1">
+            É com essa senha que o membro vai entrar no app. Anote e passe para ele.
+          </p>
         </section>
+
+        {error && (
+          <div className="px-4 py-3 bg-rose-50 border border-rose-200 text-rose-700 text-sm rounded-2xl">
+            {error}
+          </div>
+        )}
 
         <div className="flex gap-4 pt-4">
           <button 

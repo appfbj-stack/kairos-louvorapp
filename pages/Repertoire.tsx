@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { Song } from '../types';
 import { useData } from '../context/DataContext';
-import { GeminiService } from '../services/geminiService';
+import { AIService } from '../services/aiService';
 import { ChordDictionary } from '../components/ChordDictionary';
 import { getHarmonicField } from '../data/chords';
 import { ReferencePlayer } from '../components/ReferencePlayer';
@@ -92,7 +92,7 @@ const Repertoire: React.FC = () => {
   const [detailTab, setDetailTab] = useState<'lyrics' | 'arrangement'>('lyrics');
 
   const musicalKeys = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-  const gemini = GeminiService.getInstance();
+  const ai = AIService.getInstance();
 
   const filteredSongs = songs.filter(song => {
     const matchesSearch = 
@@ -151,7 +151,7 @@ const Repertoire: React.FC = () => {
       // We use the current key of the original object in context as the "from" 
       // but if the user just clicked [+] then the context is updated.
       // This is a simple implementation:
-      const newLyrics = await gemini.transposeLyrics(selectedSong.lyrics, "anterior", selectedSong.key);
+      const newLyrics = await ai.transposeLyrics(selectedSong.lyrics, "anterior", selectedSong.key);
       const updated = { ...selectedSong, lyrics: newLyrics };
       updateSong(updated);
       setSelectedSong(updated);

@@ -72,4 +72,20 @@ router.delete(
   }),
 );
 
+// ── DELETE /api/chat (limpa tudo — só líder) ─────────────────────
+router.delete(
+  '/',
+  asyncHandler(async (req: Request, res: Response) => {
+    if (req.user!.role !== 'LEADER' && req.user!.role !== 'SUPER_ADMIN') {
+      return res
+        .status(403)
+        .json({ success: false, error: 'Apenas o líder pode limpar o chat do ministério' });
+    }
+    const { count } = await prisma.chatMessage.deleteMany({
+      where: { tenantId: req.tenantId },
+    });
+    return res.json({ success: true, message: `${count} mensagens removidas`, count });
+  }),
+);
+
 export default router;

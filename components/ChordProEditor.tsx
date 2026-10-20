@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react';
 import { Music, Eye, EyeOff, Plus, X, Wand2 } from 'lucide-react';
 import { ROOT_NAMES, CHORD_TYPES, RootType, ChordTypeSuffix } from '../data/chords';
 import { ChordProRenderer } from './ChordProRenderer';
-import { GeminiService } from '../services/geminiService';
+import { AIService } from '../services/aiService';
 
 interface ChordProEditorProps {
   value: string;
@@ -130,8 +130,8 @@ export const ChordProEditor: React.FC<ChordProEditorProps> = ({
     if (!value || aiBusy) return;
     setAiBusy(true);
     try {
-      const gemini = GeminiService.getInstance();
-      const formatted = await gemini.formatLyrics(value);
+      const ai = AIService.getInstance();
+      const formatted = await ai.formatLyrics(value);
       onChange(formatted);
     } catch (e) {
       console.error(e);
