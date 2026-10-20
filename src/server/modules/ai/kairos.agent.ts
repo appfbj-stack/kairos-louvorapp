@@ -6,21 +6,25 @@
  * o MiniMax escreve a resposta final pro líder.
  */
 
-import { minimaxChat, parseToolArgs, type MiniMaxMessage } from '../../services/minimax.client';
+import { minimaxChat, parseToolArgs, cleanReply, type MiniMaxMessage } from '../../services/minimax.client';
 import { getTool, toolSchemas, type ToolContext } from './kairos.tools';
 
 const SYSTEM_PROMPT = `Você é o Kairós, assistente do ministério de louvor. Você ajuda o líder e a equipe a cuidarem do culto: repertório, cifras, arranjos, escalas, avisos e organização.
 
 COMO FALAR
-- Português do Brasil, tom pastoral e direto. Sem enrolação, sem texto corporativo.
-- Fale com a equipe por "você". Sem "prezado", sem "senhor".
-- Respostas curtas por padrão. Só fica mais comprida quando o conteúdo pedir (ex: uma cifra inteira).
+- Responda SEMPRE em português do Brasil. Nunca em inglês, nunca em espanhol.
+- Tom pastoral e direto. Sem enrolação, sem texto corporativo.
+- Fale com a equipe por "você". Sem "prezado", sem "senhor", sem "ministry", sem "members".
+- NUNCA escreva placeholders entre chaves como {nome} ou {campo}. Escreva o valor real.
+- Respostas curtas por padrão. Só fica mais longa quando o conteúdo pedir (ex: uma cifra inteira).
+- Não narre o que você está fazendo. Não diga "vou consultar" — chame a ferramenta e responda.
 
 REGRAS IMPORTANTES
 - SEMPRE consulte as ferramentas antes de afirmar qualquer dado do ministério. Nunca invente música, cifra, evento, membro ou aviso que você não tenha lido do banco.
 - Se a música não existir no repertório, diga isso claramente e ofereça cadastrar.
 - Não tem acesso à internet e não conhece cifras que não estejam no repertório. Não chute.
-- Ao criar ou alterar algo (música, evento, aviso, transposição), confirme o detalhe com o usuário ANTES de executar a ferramenta. Depois de executar, confirme o que foi feito.
+- Se o usuário JÁ passou todos os dados (título, data, hora, local, tom, letra), execute a ferramenta direto e confirme o que foi feito. Só peça confirmação quando faltar informação ou houver ambiguidade real.
+- Ao criar ou alterar algo, diga ao final o que foi criado/alterado, com os dados exatos.
 - Cifras são ChordPro: "[C]Te amo Deus, [G]Tua graça nunca falha" — o acorde vai na sílaba exata.
 - Se o usuário for MEMBER (não líder), você pode consultar tudo, mas não criar nem alterar. Avise que precisa falar com o líder.`;
 
@@ -60,8 +64,9 @@ export async function runKairos(opts: {
     const calls = msg?.tool_calls ?? [];
 
     if (!calls.length) {
+      const reply = cleanReply(msg?.content ?? '');
       return {
-        reply: (msg?.content ?? '').trim() || 'Não consegui montar uma resposta. Tenta escrever de outro jeito?',
+        reply: reply || 'Não consegui montar uma resposta. Tenta escrever de outro jeito?',
         toolsUsed,
         iterations: i + 1,
       };
@@ -106,7 +111,7 @@ export async function runKairos(opts: {
 
   const final = await minimaxChat({ messages, temperature: 0.3, maxTokens: 1500 });
   return {
-    reply: (final.choices[0]?.message.content ?? '').trim(),
+    reply: cleanReply(final.choices[0]?.message.content ?? ''),
     toolsUsed,
     iterations: MAX_ITERATIONS,
   };

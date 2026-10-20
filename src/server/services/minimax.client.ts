@@ -101,8 +101,22 @@ export async function minimaxChat(opts: {
 }
 
 /**
+ * MiniMax-M3 emite raciocínio em <think>...</think> dentro do content.
+ * Isso NUNCA deve chegar ao usuário — strip obrigatório em toda resposta.
+ */
+export function cleanReply(raw: string | null | undefined): string {
+  if (!raw) return '';
+  let text = raw;
+  const lastThink = text.lastIndexOf('</think>');
+  if (lastThink !== -1) text = text.slice(lastThink + '</think>'.length);
+  text = text.replace(/<think>[\s\S]*?<\/think>/gi, '');
+  text = text.replace(/<think>[\s\S]*$/gi, '');
+  return text.trim();
+}
+
+/**
  * Atalho pra quando não há tool calling: só texto.
- * Retorna string (stringify quando o modelo devolveu tool_call sem tool disponível).
+ * Retorna string já sem blocos de raciocínio.
  */
 export async function minimaxText(opts: {
   system: string;
@@ -120,7 +134,7 @@ export async function minimaxText(opts: {
   });
 
   const msg = res.choices[0]?.message;
-  return (msg?.content ?? '').trim();
+  return cleanReply(msg?.content);
 }
 
 /** Parse seguro dos argumentos JSON de uma tool call. */
