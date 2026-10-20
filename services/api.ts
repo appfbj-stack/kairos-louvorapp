@@ -149,6 +149,19 @@ export const authApi = {
       },
     ),
 
+  /** Cria uma igreja nova (trial de 10 dias) + o líder. Já devolve o token. */
+  signup: (data: {
+    tenantName: string;
+    tenantSlug: string;
+    adminName: string;
+    adminEmail: string;
+    adminPassword: string;
+  }) =>
+    post<{ success: boolean; token: string; user: any }>('/auth/signup-tenant', data).then((r) => {
+      setToken(r.token);
+      return { token: r.token, user: toUser(r.user) };
+    }),
+
   me: () => get<Envelope<any>>('/auth/me').then((r) => toUser(r.data)),
 };
 

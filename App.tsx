@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
@@ -16,6 +16,7 @@ import Chat from './pages/Chat';
 import VocalTraining from './pages/VocalTraining';
 import VideoLessons from './pages/VideoLessons';
 import Login from './pages/Login';
+import Signup from './pages/Signup';
 import AiChat from './pages/AiChat';
 import { UserRole } from './types';
 import { DataProvider } from './context/DataContext';
@@ -31,6 +32,11 @@ function isAdminPath(): boolean {
 
 const AppContent: React.FC = () => {
   const { user, loading, logout } = useAuth();
+  // O CTA da landing de vendas manda pra cá: /app/criar
+  const [criando, setCriando] = useState(
+    typeof window !== 'undefined' &&
+      window.location.pathname.replace(/\/+$/, '').endsWith('/criar'),
+  );
 
   if (loading) {
     return (
@@ -40,7 +46,9 @@ const AppContent: React.FC = () => {
     );
   }
 
-  if (!user) return <Login />;
+  if (criando && !user) return <Signup onVoltar={() => setCriando(false)} />;
+
+  if (!user) return <Login onCriarConta={() => setCriando(true)} />;
 
   const role = user.role as UserRole;
 

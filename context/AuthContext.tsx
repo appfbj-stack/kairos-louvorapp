@@ -12,6 +12,8 @@ interface AuthContextType {
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
+  /** Entra direto após o cadastro, sem passar pelo login. */
+  setUserFromSignup: (user: User) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -69,8 +71,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
   }, []);
 
+  const setUserFromSignup = useCallback((me: User) => {
+    setError(null);
+    setUser(me);
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, loading, error, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, error, login, logout, setUserFromSignup }}>
       {children}
     </AuthContext.Provider>
   );

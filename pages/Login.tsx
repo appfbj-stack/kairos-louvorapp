@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Music4, LogIn, AlertCircle, Loader2 } from 'lucide-react';
+import { Music4, LogIn, AlertCircle, Loader2, Sparkles } from 'lucide-react';
 
-export const Login: React.FC = () => {
+export const Login: React.FC<{ onCriarConta?: () => void }> = ({ onCriarConta }) => {
   const { login, error } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -87,6 +87,17 @@ export const Login: React.FC = () => {
             {busy ? 'Entrando...' : 'Entrar'}
           </button>
         </form>
+
+        {onCriarConta && (
+          <button
+            type="button"
+            onClick={onCriarConta}
+            className="w-full flex items-center justify-center gap-2.5 py-3.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-violet-500/40 rounded-2xl font-bold transition-all"
+          >
+            <Sparkles size={18} className="text-violet-300" />
+            Criar conta grátis da minha igreja
+          </button>
+        )}
 
         <p className="text-xs text-slate-500 text-center leading-relaxed">
           Os dados do seu ministério ficam salvos na nuvem e são acessados de qualquer
