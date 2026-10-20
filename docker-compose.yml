@@ -12,8 +12,10 @@ services:
       - JWT_SECRET=${JWT_SECRET:-kairos-louvor-jwt-secret-2026-rotate-em-prod-A8nM3kP9xR2wT}
       - APP_URL=${APP_URL:-https://louvorapp.fbautomacao.space}
       - ADMIN_URL=${ADMIN_URL:-https://admin.louvorapp.fbautomacao.space}
-      # Conexão com o Postgres compartilhado (kairos-shared-pg)
-      - DATABASE_URL=postgresql://kairos_louvorapp_user:Louvor@k@i0s!2026@kairos-shared-pg:5432/kairos_louvorapp_db
+      # Conexão com o Postgres compartilhado (kairos-shared-pg).
+      # A senha tem @ e ! — precisa ser URL-encoded (%40 / %21) senão cada
+      # parser lê um trecho diferente e o login quebra.
+      - DATABASE_URL=${DATABASE_URL:?DATABASE_URL nao definida no .env}
       # —— IA (MiniMax M3) — assistente Kairós + funções de cifras ——
       - MINIMAX_API_KEY=${MINIMAX_API_KEY:-}
       - MINIMAX_BASE_URL=${MINIMAX_BASE_URL:-https://api.minimax.io/v1}
