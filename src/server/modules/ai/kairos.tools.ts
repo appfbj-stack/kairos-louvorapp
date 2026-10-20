@@ -387,29 +387,32 @@ const criar_evento: ToolDefinition = {
     },
   },
   execute: async (args, ctx) => {
-    if (!canWrite(ctx)) return denied('criar_evento');
-    const titulo = asString(args.titulo);
-    const data = asString(args.data);
-    if (!titulo || !data) return { ok: false, erro: 'Título e data são obrigatórios.' };
+      if (!canWrite(ctx)) return denied('criar_evento');
+      const titulo = asString(args.titulo);
+      const dataISO = asString(args.data);
+      if (!titulo || !dataISO) return { ok: false, erro: 'Título e data são obrigatórios.' };
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dataISO)) {
+        return { ok: false, erro: `Data inválida ("${dataISO}"). Use o formato YYYY-MM-DD.` };
+      }
 
-    const tipo = ['CULTO', 'ENSAIO', 'ESPECIAL'].includes(asString(args.tipo))
-      ? (asString(args.tipo) as 'CULTO' | 'ENSAIO' | 'ESPECIAL')
-      : 'CULTO';
+      const tipo = ['CULTO', 'ENSAIO', 'ESPECIAL'].includes(asString(args.tipo))
+        ? (asString(args.tipo) as 'CULTO' | 'ENSAIO' | 'ESPECIAL')
+        : 'CULTO';
 
-    const ev = await prisma.event.create({
-      data: {
-        tenantId: ctx.tenantId,
-        title: titulo,
-        type: tipo,
-        date,
-        time: asString(args.hora, '19:00'),
-        location: asString(args.local, 'A definir'),
-        observations: asString(args.observacoes) || null,
-        scale: [],
-      },
-    });
-    return { ok: true, mensagem: `"${ev.title}" (${ev.type}) criado para ${ev.date} às ${ev.time}.`, id: ev.id };
-  },
+      const ev = await prisma.event.create({
+        data: {
+          tenantId: ctx.tenantId,
+          title: titulo,
+          type: tipo,
+          date: dataISO,
+          time: asString(args.hora, '19:00'),
+          location: asString(args.local, 'A definir'),
+          observations: asString(args.observacoes) || null,
+          scale: [],
+        },
+      });
+      return { ok: true, mensagem: `"${ev.title}" (${ev.type}) criado para ${ev.date} às ${ev.time}.`, id: ev.id };
+    },
 };
 
 const publicar_aviso: ToolDefinition = {
