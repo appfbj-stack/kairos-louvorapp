@@ -37,6 +37,32 @@ model Tenant {
   events   Event[]
   notices  Notice[]
   messages ChatMessage[]
+  settings MinistrySettings?
+}
+
+// ============================================================
+// MINISTRY SETTINGS (configurações por tenant)
+// ============================================================
+model MinistrySettings {
+  id        String @id @default(uuid())
+  tenantId  String @unique
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  name      String  @default("Kairos Louvor")
+  churchName String @default("Igreja Local")
+  youtubeChannel String @default("")
+  driveFolder String @default("")
+  spotifyPlaylist String @default("")
+  instagram String @default("")
+
+  allowMemberChat   Boolean @default(true)
+  allowMemberNotices Boolean @default(true)
+
+  confirmationDeadlineDays Int @default(3)
+  enableVocalTraining     Boolean @default(true)
+  enableVideoLessons      Boolean @default(true)
+
+  updatedAt DateTime @updatedAt
 }
 
 // ============================================================

@@ -11,6 +11,9 @@ import songsRoutes from "./modules/songs/songs.routes";
 import eventsRoutes from "./modules/events/events.routes";
 import noticesRoutes from "./modules/notices/notices.routes";
 import chatRoutes from "./modules/chat/chat.routes";
+import membersRoutes from "./modules/members/members.routes";
+import settingsRoutes from "./modules/settings/settings.routes";
+import aiRoutes from "./modules/ai/ai.routes";
 import { authMiddleware } from "./middleware/auth";
 import fs from "fs";
 
@@ -121,6 +124,20 @@ async function startServer() {
   app.use("/api/events", authMiddleware, eventsRoutes);
   app.use("/api/notices", authMiddleware, noticesRoutes);
   app.use("/api/chat", authMiddleware, chatRoutes);
+  app.use("/api/members", authMiddleware, membersRoutes);
+  app.use("/api/settings", authMiddleware, settingsRoutes);
+
+  // ==========================================
+  // IA (MiniMax) — assistente Kairós + funções
+  // ==========================================
+  const aiLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, error: "Muitas consultas à IA. Aguarde um instante." },
+  });
+  app.use("/api/ai", aiLimiter, authMiddleware, aiRoutes);
 
   // ==========================================
   // Health check
@@ -136,6 +153,7 @@ async function startServer() {
       auth: "JWT",
       multiTenant: true,
       superAdmin: true,
+      ai: env.MINIMAX_API_KEY ? "MiniMax" : "desligada",
     });
   });
 

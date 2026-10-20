@@ -23,5 +23,9 @@ export const env = {
   NODE_ENV: optional('NODE_ENV', 'development'),
   APP_URL: optional('APP_URL', 'http://localhost:3000'),
   ADMIN_URL: optional('ADMIN_URL', 'http://localhost:3000'),
-  GEMINI_API_KEY: optional('GEMINI_API_KEY', ''),
+
+  // —— IA (MiniMax M3, OpenAI-compatible) ——
+  MINIMAX_API_KEY: optional('MINIMAX_API_KEY', ''),
+  MINIMAX_BASE_URL: optional('MINIMAX_BASE_URL', 'https://api.minimax.io/v1'),
+  MINIMAX_MODEL: optional('MINIMAX_MODEL', 'MiniMax-M3'),
 };

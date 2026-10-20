@@ -4,20 +4,24 @@ services:
     container_name: kairos-louvorapp-app
     restart: unless-stopped
     ports:
-      - "3017:3000"
+      # Só localhost — o acesso público é feito pelo Caddy
+      - "127.0.0.1:3017:3000"
     environment:
       - NODE_ENV=production
       - PORT=3000
-      # JWT secret (gerar um novo e guardar em local seguro!)
       - JWT_SECRET=${JWT_SECRET:-kairos-louvor-jwt-secret-2026-rotate-em-prod-A8nM3kP9xR2wT}
       - APP_URL=${APP_URL:-https://louvorapp.fbautomacao.space}
       - ADMIN_URL=${ADMIN_URL:-https://admin.louvorapp.fbautomacao.space}
       # Conexão com o Postgres compartilhado (kairos-shared-pg)
       - DATABASE_URL=postgresql://kairos_louvorapp_user:Louvor@k@i0s!2026@kairos-shared-pg:5432/kairos_louvorapp_db
-      # Google Gemini (mantido da V1 — feature de IA)
-      - API_KEY=${API_KEY:-}
+      # —— IA (MiniMax M3) — assistente Kairós + funções de cifras ——
+      - MINIMAX_API_KEY=${MINIMAX_API_KEY:-}
+      - MINIMAX_BASE_URL=${MINIMAX_BASE_URL:-https://api.minimax.io/v1}
+      - MINIMAX_MODEL=${MINIMAX_MODEL:-MiniMax-M3}
     networks:
-      - bridge
+      # Precisa ser a dokploy-network: é onde o kairos-shared-pg está.
+      # Na rede bridge default o container NÃO enxerga o Postgres por DNS.
+      - dokploy-network
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:3000/api/health"]
       interval: 30s
@@ -25,10 +29,6 @@ services:
       retries: 3
       start_period: 40s
 
-# O container se conecta à rede `bridge` (default) onde já está
-# o `kairos-shared-pg`, permitindo acessar o Postgres via DNS:
-#   kairos-shared-pg:5432
 networks:
-  bridge:
-    name: bridge
+  dokploy-network:
     external: true
