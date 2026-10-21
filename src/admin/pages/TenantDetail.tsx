@@ -7,6 +7,7 @@ import {
   blockTenant,
   unblockTenant,
   resetTrial,
+  activatePro,
   deleteTenant,
   uploadTenantLogo,
   TenantRow,
@@ -85,6 +86,22 @@ export default function TenantDetail() {
     setBusy(true);
     try {
       await resetTrial(tenant.id);
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleAssinar() {
+    if (!tenant) return;
+    const meses = prompt(
+      `Pix confirmado?\n\nAtivar o Pro de "${tenant.name}" por quantos meses?`,
+      "1",
+    );
+    if (meses === null) return;
+    setBusy(true);
+    try {
+      await activatePro(tenant.id, Number(meses) || 1);
       await load();
     } finally {
       setBusy(false);
@@ -276,6 +293,15 @@ export default function TenantDetail() {
               >
                 ⏱ Resetar trial (10 dias)
               </button>
+              {tenant.subscriptionStatus !== "ACTIVE" && (
+                <button
+                  onClick={handleAssinar}
+                  disabled={busy}
+                  className="w-full text-left px-3 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded text-sm disabled:opacity-40"
+                >
+                  ✅ Ativar Pro (Pix confirmado)
+                </button>
+              )}
               <a
                 href={`https://${tenant.slug}.louvorapp.fbautomacao.space`}
                 target="_blank"

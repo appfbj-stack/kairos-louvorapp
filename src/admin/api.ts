@@ -153,6 +153,12 @@ export async function resetTrial(id: string) {
   return data;
 }
 
+/** Ativa o Pro apos confirmar o Pix recebido. `meses` = periodo pago. */
+export async function activatePro(id: string, meses = 1) {
+  const { data } = await adminApi.post(`/api/super-admin/tenants/${id}/assinar`, { meses });
+  return data;
+}
+
 export async function deleteTenant(id: string) {
   const { data } = await adminApi.delete(`/api/super-admin/tenants/${id}`);
   return data;

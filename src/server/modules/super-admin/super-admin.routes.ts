@@ -361,6 +361,40 @@ router.post(
   }),
 );
 
+// ── POST /api/super-admin/tenants/:id/assinar ─────────────────
+// Ativa o Pro apos o Pix ser confirmado. `meses` define o periodo pago.
+router.post(
+  '/tenants/:id/assinar',
+  asyncHandler(async (req: Request, res: Response) => {
+    const meses = Math.min(Math.max(parseInt(String(req.body?.meses ?? '1'), 10) || 1, 1), 12);
+    const updated = await prisma.tenant.update({
+      where: { id: req.params.id },
+      data: {
+        subscriptionStatus: 'ACTIVE',
+        trialEndsAt: null,
+        motivoBloqueio: null,
+        bloqueadoEm: null,
+        bloqueadoPor: null,
+        subscriptionEndsAt: new Date(Date.now() + meses * 30 * 24 * 60 * 60 * 1000),
+      },
+    });
+    await prisma.auditLog.create({
+      data: {
+        superAdminId: req.user!.userId,
+        superAdminEmail: req.user!.email,
+        action: 'ASSINAR_PRO',
+        targetId: updated.id,
+        details: { meses, valor: '29.99' },
+      },
+    });
+    return res.json({
+      success: true,
+      data: updated,
+      message: `Pro ativado por ${meses} ${meses === 1 ? 'mês' : 'meses'}`,
+    });
+  }),
+);
+
 // ── DELETE /api/super-admin/tenants/:id ───────────────────────
 router.delete(
   '/tenants/:id',
